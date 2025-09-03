@@ -33,7 +33,212 @@ class TestPeakFunctions(unittest.TestCase):
         """Create test data."""
         self.x = np.linspace(0, 100, 101)
     
-    def test_gaussian_function(self):
+    def test_fit_multiplet(self):
+        """Test general multiplet fitting."""
+        # Approximate peak positions
+        peak_indices = [250, 265]
+        
+        results = fit_multiplet(
+            self.channels,
+            self.counts,
+            peak_indices,
+            peak_model='gaussian',
+            background_method='linear'
+        )
+        
+        # Should return results for each peak
+        self.assertEqual(len(results), len(peak_indices))
+        
+        # Check that peaks are reasonably fitted
+        for result in results:
+            self.assertGreater(result['amplitude'], 100)
+            self.assertGreater(result['area'], 1000)
+            self.assertTrue(result['multiplet'])
+
+
+class TestParameterBounds(unittest.TestCase):
+    """Test parameter bounds for fitting."""
+    
+    def test_gaussian_bounds(self):
+        """Test bounds for Gaussian fitting."""
+        x_fit = np.linspace(100, 200, 101)
+        y_fit = np.random.randn(101) * 10 + 100
+        
+        initial_params = (500, 150, 10, 0.1, 50)
+        
+        lower, upper = get_parameter_bounds(
+            x_fit, y_fit, 'gaussian', initial_params
+        )
+        
+        # Check bounds are reasonable
+        # Amplitude should be positive
+        self.assertEqual(lower[0], 0)
+        self.assertEqual(upper[0], np.inf)
+        
+        # Centroid should be within fit range
+        self.assertEqual(lower[1], x_fit[0])
+        self.assertEqual(upper[1], x_fit[-1])
+        
+        # Sigma should be positive but limited
+        self.assertGreater(lower[2], 0)
+        self.assertLess(upper[2], (x_fit[-1] - x_fit[0]))
+        
+        # Background intercept should be positive
+        self.assertEqual(lower[4], 0)
+
+
+class TestFitQuality(unittest.TestCase):
+    """Test fit quality metrics."""
+    
+    def test_good_fit_metrics(self):
+        """Test metrics for a good fit."""
+        np.random.seed(42)
+        channels = np.arange(200)
+        
+        # Create clean peak
+        true_params = [500, 100, 5, 0.1, 20]
+        counts = gaussian_with_background(channels, *true_params)
+        counts = np.random.poisson(counts)
+        
+        # Fit peak
+        result = fit_single_peak(
+            channels,
+            counts,
+            np.argmax(counts)
+        )
+        
+        # Good fit should have:
+        # - High SNR
+        self.assertGreater(result['snr'], 20)
+        
+        # - Chi-square close to 1
+        self.assertGreater(result['chi_square'], 0.7)
+        self.assertLess(result['chi_square'], 1.5)
+        
+        # - Small uncertainties
+        self.assertLess(result['centroid_err'], 1)
+        self.assertLess(result['fwhm_err'], 2)
+    
+    def test_poor_fit_metrics(self):
+        """Test metrics for a poor fit."""
+        channels = np.arange(200)
+        
+        # Create noisy, weak peak
+        counts = 10 * np.exp(-0.5 * ((channels - 100) / 5) ** 2)
+        counts += np.random.randn(200) * 5  # High noise
+        counts = np.maximum(counts, 0)
+        
+        # Fit peak
+        result = fit_single_peak(
+            channels,
+            counts,
+            np.argmax(counts)
+        )
+        
+        if result['fit_success']:
+            # Poor fit should have:
+            # - Low SNR
+            self.assertLess(result['snr'], 5)
+            
+            # - Large uncertainties
+            self.assertGreater(result['centroid_err'], 0.5)
+
+
+class TestIntegrationFitting(unittest.TestCase):
+    """Integration tests for fitting module."""
+    
+    def test_full_fitting_pipeline(self):
+        """Test complete fitting pipeline."""
+        # Generate complex spectrum
+        np.random.seed(42)
+        channels, counts = generate_synthetic_spectrum(
+            num_channels=2048,
+            peaks=[
+                (300, 2000, 5),    # Strong isolated peak
+                (600, 1000, 8),    # Medium peak
+                (900, 500, 6),     # Weak peak
+                (1200, 800, 7),    # Multiplet component 1
+                (1215, 600, 5),    # Multiplet component 2
+                (1500, 1500, 10),  # Broad peak
+            ],
+            background_level=20,
+            noise_level=1
+        )
+        
+        # Detect peaks
+        from gammafit.detection import detect_peaks
+        peak_indices = detect_peaks(
+            counts,
+            min_prominence=50,
+            min_height=30,
+            min_distance=3
+        )
+        
+        # Fit all peaks
+        fitted_peaks = fit_peaks(
+            channels,
+            counts,
+            peak_indices,
+            peak_model='gaussian',
+            background_method='linear',
+            window_scale=3.0
+        )
+        
+        # Should fit multiple peaks
+        self.assertGreater(len(fitted_peaks), 3)
+        
+        # Check that fits are reasonable
+        successful_fits = [p for p in fitted_peaks if p['fit_success']]
+        self.assertGreater(len(successful_fits), len(fitted_peaks) * 0.5)
+        
+        # Check for multiplet detection
+        multiplets = [p for p in fitted_peaks if p.get('multiplet', False)]
+        # May or may not detect the close peaks as multiplet
+        
+        # Check peak properties
+        for peak in successful_fits:
+            # Basic sanity checks
+            self.assertGreater(peak['amplitude'], 0)
+            self.assertGreater(peak['area'], 0)
+            self.assertGreater(peak['fwhm'], 0)
+            self.assertLess(peak['fwhm'], 100)  # Not too broad
+            
+            # Centroid should be within spectrum
+            self.assertGreaterEqual(peak['centroid'], 0)
+            self.assertLessEqual(peak['centroid'], 2048)
+    
+    def test_various_peak_models(self):
+        """Test different peak models."""
+        channels = np.arange(300)
+        
+        # Create peak with tail
+        counts = gaussian_with_tail(
+            channels, 500, 150, 6, 50, 15
+        )
+        counts += 20  # Background
+        counts = np.random.poisson(counts)
+        
+        peak_idx = np.argmax(counts)
+        
+        # Try different models
+        models = ['gaussian']  # Could add more models as implemented
+        
+        for model in models:
+            result = fit_single_peak(
+                channels,
+                counts,
+                peak_idx,
+                peak_model=model
+            )
+            
+            # Should produce reasonable fit
+            if result['fit_success']:
+                self.assertAlmostEqual(result['centroid'], 150, delta=5)
+                self.assertGreater(result['amplitude'], 100)
+
+
+if __name__ == '__main__':
+    unittest.main()gaussian_function(self):
         """Test Gaussian peak function."""
         # Parameters
         amplitude = 100
