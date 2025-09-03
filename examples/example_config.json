@@ -1,0 +1,77 @@
+{
+    "description": "Example configuration for gamma spectrum analysis",
+    "version": "1.0",
+    
+    "detection": {
+        "min_prominence": 50,
+        "min_height": 30,
+        "min_distance": 5,
+        "smoothing_window": 7,
+        "smoothing_method": "savgol",
+        "background_method": "snip"
+    },
+    
+    "fitting": {
+        "peak_model": "gaussian",
+        "background_method": "linear",
+        "window_scale": 3.0,
+        "max_iterations": 5000
+    },
+    
+    "calibration": {
+        "model": "linear",
+        "reference_peaks": [
+            {
+                "channel": 511,
+                "energy": 511.0,
+                "isotope": "Na-22",
+                "description": "Annihilation peak"
+            },
+            {
+                "channel": 661,
+                "energy": 661.66,
+                "isotope": "Cs-137",
+                "description": "Primary gamma"
+            },
+            {
+                "channel": 1274,
+                "energy": 1274.53,
+                "isotope": "Na-22",
+                "description": "Primary gamma"
+            }
+        ],
+        "auto_calibrate": false
+    },
+    
+    "output": {
+        "directory": "./results",
+        "prefix": "analysis_",
+        "generate_plot": true,
+        "plot_format": "png",
+        "plot_style": "publication",
+        "export_fits": true,
+        "export_format": "csv",
+        "generate_report": true,
+        "report_format": "html"
+    },
+    
+    "isotope_library": {
+        "enabled": true,
+        "isotopes": ["Na-22", "Cs-137", "Co-60", "Ba-133", "Eu-152"],
+        "tolerance_keV": 2.0
+    },
+    
+    "quality_checks": {
+        "min_total_counts": 10000,
+        "max_dead_time": 10.0,
+        "check_saturation": true,
+        "saturation_level": 65535
+    },
+    
+    "advanced": {
+        "parallel_processing": false,
+        "verbose": true,
+        "debug": false,
+        "save_intermediate": false
+    }
+}
