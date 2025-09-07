@@ -4,8 +4,6 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.7%2B-blue?style=for-the-badge&logo=python)](https://www.python.org)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
-[![Code Style](https://img.shields.io/badge/code%20style-black-000000?style=for-the-badge)](https://github.com/psf/black)
-[![Documentation Status](https://img.shields.io/badge/docs-available-brightgreen?style=for-the-badge)](docs/)
 [![Build Status](https://img.shields.io/badge/build-passing-success?style=for-the-badge)](https://github.com/drgtheneutrino/gamma-peak-identifier/actions)
 [![Coverage](https://img.shields.io/badge/coverage-95%25-success?style=for-the-badge)](https://codecov.io)
 [![PyPI Version](https://img.shields.io/badge/PyPI-v0.1.0-informational?style=for-the-badge)](https://pypi.org/project/gammafit/)
